@@ -41,7 +41,7 @@ Example:
 
 ### Edit a Todo Title
 ```bash
---edit [index]
+--edit [index]:"New Title"
 ```
 
 ### Sort Todos
@@ -63,7 +63,7 @@ The application allows you to sort your Todo items either by their title or dead
 go run ./ --add "Go outside" --deadline "2h 30m"
 go run ./ --list
 go run ./ --toggle 1
-go run ./ --edit 1 "Go to park"
+go run ./ --edit 1:"Go to park"
 go run ./ --del 2
 go run ./ --sort=deadline --ascend=true --list
 ```

@@ -1,7 +1,7 @@
 
 # Todo Reminder Project
 
-This is a command-line interface (CLI) application to manage your Todo list with support for reminders, complex deadlines, sorting, and more.
+This is a command-line interface (CLI) application to manage your Todo list with support for deadlines, sorting, and more.
 
 ## Features
 - Add a new Todo item with a specified title and deadline

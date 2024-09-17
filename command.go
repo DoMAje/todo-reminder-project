@@ -15,6 +15,8 @@ type CmdFlags struct {
 	Edit   string
 	Toggle int
 	List   bool
+	Sort string
+	Ascend bool
 }
 
 func NewCmdFlags() *CmdFlags {
@@ -26,24 +28,32 @@ func NewCmdFlags() *CmdFlags {
 	flag.IntVar(&cf.Del, "del", -1, "Specify a todo by index to delete")
 	flag.IntVar(&cf.Toggle, "toggle", -1, "Specify a todo by index to toggle")
 	flag.BoolVar(&cf.List, "list", false, "List all todos")
+	flag.StringVar(&cf.Sort, "sort", "", "Sort todos by 'title' or 'deadline" )
+	flag.BoolVar(&cf.Ascend, "ascend", true, "Sort by ascending or descending")
 
 	flag.Parse()
 
 	return &cf
 }
 
+// Execute method in CmdFlags
 func (cf *CmdFlags) Execute(todos *Todos) {
 	switch {
 	case cf.List:
+		if cf.Sort != "" {
+			err := todos.sort(cf.Sort, cf.Ascend)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		}
 		todos.print()
 	case cf.Add != "":
-		// Handle the 'add' command with optional deadline
-		todoTitle := cf.Add
-		var durationString string
+		duration := ""
 		if cf.Deadline != "" {
-			durationString = cf.Deadline
+			duration = cf.Deadline
 		}
-		todos.add(todoTitle, durationString)
+		todos.add(cf.Add, duration)
 	case cf.Edit != "":
 		parts := strings.SplitN(cf.Edit, ":", 2)
 		if len(parts) != 2 {
@@ -52,7 +62,6 @@ func (cf *CmdFlags) Execute(todos *Todos) {
 		}
 
 		index, err := strconv.Atoi(parts[0])
-
 		if err != nil {
 			fmt.Println("Error: invalid index for edit")
 			os.Exit(1)
@@ -66,7 +75,17 @@ func (cf *CmdFlags) Execute(todos *Todos) {
 	case cf.Del != -1:
 		todos.delete(cf.Del)
 
+	case cf.Sort != "":
+		err := todos.sort(cf.Sort, cf.Ascend)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		todos.print() // Print sorted list
+
 	default:
 		fmt.Println("Invalid command")
 	}
 }
+
+

@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"regexp"
+	"sort"
 
 	"github.com/aquasecurity/table"
 )
@@ -22,16 +24,41 @@ type Todo struct {
 // Todo slice
 type Todos []Todo
 
+// ParseComplexDuration parses a complex duration string like "1d 2h 30m" and returns a time.Duration.
+func ParseComplexDuration(durationStr string) (time.Duration, error) {
+	var totalDuration time.Duration
+	re := regexp.MustCompile(`(\d+)([dhm])`)
+	matches := re.FindAllStringSubmatch(durationStr, -1)
+
+	for _, match := range matches {
+		value, err := strconv.Atoi(match[1])
+		if err != nil {
+			return 0, err
+		}
+
+		switch match[2] {
+		case "d":
+			totalDuration += time.Duration(value*24) * time.Hour
+		case "h":
+			totalDuration += time.Duration(value) * time.Hour
+		case "m":
+			totalDuration += time.Duration(value) * time.Minute
+		}
+	}
+
+	return totalDuration, nil
+}
+
+
 func (todos *Todos) add(title string, durationString ...string) {
 	// Define a default deadline (e.g., one month from now)
 	defaultDeadline := time.Now().AddDate(0, 1, 0)
 
 	var todoDeadline time.Time
-	if len(durationString) >= 1 {
-		// Parse duration
-		duration, err := time.ParseDuration(durationString[0])
+	if len(durationString) > 0 {
+		duration, err := ParseComplexDuration(durationString[0])
 		if err != nil {
-			fmt.Println("Invalid duration format! Use a valid Go duration string (e.g., '24h', '1d').")
+			fmt.Println("Invalid duration format! Use a valid format (e.g., '1d 2h 30m').")
 			return
 		}
 		todoDeadline = time.Now().Add(duration)
@@ -54,8 +81,6 @@ func (todos *Todos) add(title string, durationString ...string) {
 	// Add to existing list using pointer
 	*todos = append(*todos, todo)
 }
-
-
 
 // Method that checks whether provided index is valid
 func (todos *Todos) validateIndex(index int) error {
@@ -118,6 +143,28 @@ func (todos *Todos) edit(index int, title string) error {
 	return nil
 }
 
+func (todos *Todos) sort(criteria string, ascending bool) error {
+	t := *todos
+
+	switch criteria {
+	case "title":
+		if ascending {
+			sort.SliceStable(t, func(i, j int) bool {return t[i].Title < t[j].Title })
+		} else {
+			sort.SliceStable(t, func(i, j int) bool {return t[i].Title > t[j].Title})
+		}
+	case "deadline":
+		if ascending {
+			sort.SliceStable(t, func(i, j int) bool {return t[i].Deadline.Before(t[j].Deadline)})
+		} else {
+			sort.SliceStable(t, func(i, j int) bool {return t[i].Deadline.After(t[j].Deadline)})
+		}
+	default: 
+		return fmt.Errorf("Invalid sorting criteria: %s", criteria)
+	}
+	return nil
+}
+
 // Format time.Duration into a more readable format
 func formatDuration(d time.Duration) string {
 	days := int(d.Hours()) / 24
@@ -129,32 +176,42 @@ func formatDuration(d time.Duration) string {
 
 
 func (todos *Todos) print() {
+	// Calculate the current time once
+	now := time.Now()
+
+	// Recalculate UntilDeadline for each todo
+	for i := range *todos {
+		(*todos)[i].UntilDeadline = (*todos)[i].Deadline.Sub(now)
+	}
+
+	// Create and configure the table for output
 	table := table.New(os.Stdout)
 	table.SetRowLines(false)
 	table.SetHeaders("#", "Title", "Deadline", "Completed", "Created At", "Completed At", "Until Deadline")
-	
+
+	// Print each todo item
 	for index, t := range *todos {
 		completed := "❌"
 		completedAt := ""
-		   
+
 		if t.Completed {
 			completed = "✅"
 			if t.CompletedAt != nil {
 				completedAt = t.CompletedAt.Format(time.RFC1123)
 			}
 		}
-	
+
 		table.AddRow(
-			strconv.Itoa(index), 
-			t.Title, 
-			t.Deadline.Format(time.RFC1123), 
-			completed, 
-			t.CreatedAt.Format(time.RFC1123), 
-			completedAt, 
-			formatDuration(t.UntilDeadline), // Format duration
+			strconv.Itoa(index),
+			t.Title,
+			t.Deadline.Format(time.RFC1123),
+			completed,
+			t.CreatedAt.Format(time.RFC1123),
+			completedAt,
+			formatDuration(t.UntilDeadline),
 		)
 	}
-	
+
 	table.Render()
 }
 
